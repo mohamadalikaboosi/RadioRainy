@@ -5,15 +5,26 @@ import debug0 from 'debug';
 import { logger } from './config/logger';
 import { App } from './app';
 import mongoose from 'mongoose';
+import cron from 'node-cron';
+import telegramAdapter from './api/utils/TelegramAdapter';
 
 export class Server {
     port: number = Config.server.port;
     server: any;
     mongoDbName: string = Config.database.url;
     debug = debug0('iRole-radio-rainy:server');
+
     constructor() {
         this.setMongoConnection();
         this.setServer();
+        // cron.schedule('0 0 * * *', () => {
+        this.addMusic().then((result) => {});
+        // });
+    }
+
+    async addMusic() {
+        const a = await telegramAdapter.getMusicInformation();
+        return null;
     }
 
     setServer() {

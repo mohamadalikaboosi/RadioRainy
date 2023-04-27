@@ -53,6 +53,8 @@ interface IRepository<T extends Document> {
     insertMany(values: Partial<T>[]): Promise<T>;
 
     insertWithoutSave(value: Partial<T>): Promise<T>;
+
+    upsert(where: object, value: Partial<T>): Promise<T | null>;
 }
 
 export default class Repository<T extends Document> implements IRepository<T> {
@@ -136,5 +138,10 @@ export default class Repository<T extends Document> implements IRepository<T> {
 
     async insertWithoutSave(value: Partial<T>): Promise<T> {
         return new this.model(value);
+    }
+
+    upsert(where: object, value: Partial<T>): Promise<T | null> {
+        const options = { upsert: true, new: true, setDefaultsOnInsert: true };
+        return this.model.findOneAndUpdate(where, value, options).exec();
     }
 }
