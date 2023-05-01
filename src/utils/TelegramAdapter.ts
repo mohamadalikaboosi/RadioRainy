@@ -1,7 +1,8 @@
 import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { logger } from '../config/logger';
-import extractData from './captionExtractor';
+import extractData, { IExtractData } from './captionExtractor';
+import input from 'input';
 
 class TelegramAdapter {
     private session: StringSession = new StringSession(Config.telegram.session);
@@ -14,6 +15,16 @@ class TelegramAdapter {
         this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {
             connectionRetries: 5,
         });
+        console.log(this.client.session.serverAddress);
+        if (!this.client.session.serverAddress) {
+            await this.client.start({
+                phoneNumber: async () => await input.text('Please enter your number: '),
+                password: async () => await input.text('Please enter your password: '),
+                phoneCode: async () => await input.text('Please enter the code you received: '),
+                onError: (err) => console.log(err),
+            });
+            logger.info(`your TELEGRAM_SESSION = ${this.client.session.save()}`);
+        }
         await this.client.connect();
         logger.info('connected to telegram Successfully');
     }
@@ -37,7 +48,7 @@ class TelegramAdapter {
         const musics = await this._getMusics(offsetDate);
         const musicInfos: any = [];
         for (const music of musics) {
-            const data = extractData(music.message);
+            const data: IExtractData = extractData(music.message);
             const information = {
                 ...data,
                 telegramId: music.id,
