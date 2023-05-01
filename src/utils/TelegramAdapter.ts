@@ -1,6 +1,6 @@
 import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
-import { logger } from '../../config/logger';
+import { logger } from '../config/logger';
 import extractData from './captionExtractor';
 
 class TelegramAdapter {

@@ -6,7 +6,7 @@ import { logger } from './config/logger';
 import { App } from './app';
 import mongoose from 'mongoose';
 import cron from 'node-cron';
-import telegramAdapter from './api/utils/TelegramAdapter';
+import telegramAdapter from './utils/TelegramAdapter';
 
 export class Server {
     port: number = Config.server.port;
