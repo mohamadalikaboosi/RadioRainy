@@ -6,7 +6,7 @@ export interface IMusicDocument extends Document {
     filePath: string;
     artist: string;
     musicName: string;
-    hashtags: Types.ObjectId;
+    hashtags: Types.ObjectId[];
 }
 
 class Music extends Repository<IMusicDocument> {

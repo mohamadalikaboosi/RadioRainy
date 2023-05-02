@@ -7,7 +7,7 @@ import { App } from './app';
 import mongoose from 'mongoose';
 import cron from 'node-cron';
 import telegramAdapter from './utils/TelegramAdapter';
-import musicService from './services/Music.service';
+import musicService, { IMusicInf } from './services/Music.service';
 
 export class Server {
     port: number = Config.server.port;
@@ -25,7 +25,10 @@ export class Server {
 
     async addMusic() {
         const musicInf = await telegramAdapter.getMusicInformation();
-        await musicService.addMusic(musicInf);
+        if (musicInf.length > 0) {
+            await musicService.addMusics(musicInf);
+            await musicService.removeMusic(musicInf);
+        }
         return null;
     }
 

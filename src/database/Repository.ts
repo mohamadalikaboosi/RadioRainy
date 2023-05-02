@@ -1,4 +1,4 @@
-import { Document, Model, Types } from 'mongoose';
+import mongoose, { Document, Model, Types } from 'mongoose';
 
 interface IPopulate {
     path: string;
@@ -14,6 +14,11 @@ interface IOption {
     skip?: number;
     populate?: [IPopulate];
     lean?: boolean;
+    session?: mongoose.mongo.ClientSession;
+}
+
+interface ISessionOption {
+    session?: mongoose.mongo.ClientSession;
 }
 
 interface PaginationOptions {
@@ -23,10 +28,13 @@ interface PaginationOptions {
     page: number;
     populate?: [IPopulate];
     lean?: boolean;
+    session?: mongoose.mongo.ClientSession;
 }
 
 interface IRepository<T extends Document> {
     find(where: object, options: IOption): Promise<T[]>;
+
+    count(where: object, options: IOption): Promise<number>;
 
     findOne(where: object, options: IOption): Promise<T>;
 
@@ -34,27 +42,27 @@ interface IRepository<T extends Document> {
 
     paginate(where: object, options: PaginationOptions): Promise<T>;
 
-    update(where: object, update: Partial<T>): Promise<T>;
+    update(where: object, update: Partial<T>, option: ISessionOption): Promise<T>;
 
-    updateMany(where: object, update: Partial<T>): Promise<T>;
+    updateMany(where: object, update: Partial<T>, option: ISessionOption): Promise<T>;
 
-    findByIdAndUpdate(id: Types.ObjectId, update: Partial<T>): Promise<T>;
+    findByIdAndUpdate(id: Types.ObjectId, update: Partial<T>, option: ISessionOption): Promise<T>;
 
-    findOneAndUpdate(where: object, update: Partial<T>): Promise<T>;
+    findOneAndUpdate(where: object, update: Partial<T>, option: ISessionOption): Promise<T>;
 
-    deleteMany(where: object): Promise<T>;
+    deleteMany(where: object, option: ISessionOption): Promise<T>;
 
-    findByIdAndDelete(id: Types.ObjectId): Promise<T>;
+    findByIdAndDelete(id: Types.ObjectId, option: ISessionOption): Promise<T>;
 
-    findOneAndDelete(where: object): Promise<T>;
+    findOneAndDelete(where: object, option: ISessionOption): Promise<T>;
 
     insert(value: Partial<T>): Promise<T>;
 
-    insertMany(values: Partial<T>[]): Promise<T>;
+    insertMany(values: Partial<T>[], option: ISessionOption): Promise<T>;
 
-    insertWithoutSave(value: Partial<T>): Promise<T>;
+    insertWithoutSave(value: Partial<T>, option: ISessionOption): Promise<T>;
 
-    upsert(where: object, value: Partial<T>): Promise<T | null>;
+    upsert(where: object, value: Partial<T>, session: mongoose.mongo.ClientSession | undefined): Promise<T | null>;
 }
 
 export default class Repository<T extends Document> implements IRepository<T> {
@@ -67,6 +75,10 @@ export default class Repository<T extends Document> implements IRepository<T> {
     // Find
     async find(where: object, options: IOption = {}): Promise<any[]> {
         return this.model.find(where, {}, options).exec();
+    }
+
+    async count(where: object, options: IOption = {}): Promise<number> {
+        return this.model.find(where, {}, options).count();
     }
 
     async findOne(where: object, options: IOption = {}): Promise<any> {
@@ -98,32 +110,47 @@ export default class Repository<T extends Document> implements IRepository<T> {
     }
 
     // Update
-    async update(where: object, update: Partial<T>): Promise<any> {
+    async update(where: object, update: Partial<T>, option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.updateOne(where, update, option);
         return this.model.updateOne(where, update);
     }
 
-    async updateMany(where: object, update: Partial<T>): Promise<any> {
+    async updateMany(where: object, update: Partial<T>, option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.updateMany(where, update, option);
         return this.model.updateMany(where, update);
     }
 
-    async findByIdAndUpdate(id: Types.ObjectId, update: Partial<T>): Promise<any> {
+    async findByIdAndUpdate(
+        id: Types.ObjectId,
+        update: Partial<T>,
+        option: ISessionOption | undefined = undefined,
+    ): Promise<any> {
+        if (option) return this.model.findByIdAndUpdate(id, update, option);
         return this.model.findByIdAndUpdate(id, update);
     }
 
-    async findOneAndUpdate(where: object, update: Partial<T>): Promise<any> {
+    async findOneAndUpdate(
+        where: object,
+        update: Partial<T>,
+        option: ISessionOption | undefined = undefined,
+    ): Promise<any> {
+        if (option) return this.model.findOneAndUpdate(where, update, option);
         return this.model.findOneAndUpdate(where, update);
     }
 
     // Delete
-    async deleteMany(where: object): Promise<any> {
+    async deleteMany(where: object, option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.deleteMany(where, option);
         return this.model.deleteMany(where);
     }
 
-    async findByIdAndDelete(id: Types.ObjectId): Promise<any> {
+    async findByIdAndDelete(id: Types.ObjectId, option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.findByIdAndDelete(id, option);
         return this.model.findByIdAndDelete(id);
     }
 
-    async findOneAndDelete(where: object): Promise<any> {
+    async findOneAndDelete(where: object, option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.findOneAndDelete(where, option);
         return this.model.findOneAndDelete(where);
     }
 
@@ -132,16 +159,38 @@ export default class Repository<T extends Document> implements IRepository<T> {
         return this.model.create(value);
     }
 
-    async insertMany(values: Partial<T>[]): Promise<any> {
+    async insertMany(values: Partial<T>[], option: ISessionOption | undefined = undefined): Promise<any> {
+        if (option) return this.model.insertMany(values, option);
         return this.model.insertMany(values);
     }
 
-    async insertWithoutSave(value: Partial<T>): Promise<T> {
+    async insertWithoutSave(value: Partial<T>, option: ISessionOption | undefined = undefined): Promise<T> {
+        if (option) return new this.model(value, option);
         return new this.model(value);
     }
 
-    upsert(where: object, value: Partial<T>): Promise<T | null> {
-        const options = { upsert: true, new: true, setDefaultsOnInsert: true };
-        return this.model.findOneAndUpdate(where, value, options).exec();
+    upsert(
+        where: object,
+        value: Partial<T>,
+        session: mongoose.mongo.ClientSession | undefined = undefined,
+    ): Promise<T | null> {
+        if (session) {
+            return this.model
+                .findOneAndUpdate(where, value, {
+                    upsert: true,
+                    new: true,
+                    setDefaultsOnInsert: true,
+                    session,
+                })
+                .exec();
+        } else {
+            return this.model
+                .findOneAndUpdate(where, value, {
+                    upsert: true,
+                    new: true,
+                    setDefaultsOnInsert: true,
+                })
+                .exec();
+        }
     }
 }

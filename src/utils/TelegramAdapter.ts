@@ -1,7 +1,7 @@
 import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { logger } from '../config/logger';
-import extractData, { IExtractData } from './captionExtractor';
+import { extractData, extractProxy, IExtractData } from './extractor';
 import input from 'input';
 
 class TelegramAdapter {
@@ -14,8 +14,9 @@ class TelegramAdapter {
     async _connect() {
         this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {
             connectionRetries: 5,
+            useWSS: false, // Important. Most proxies cannot use SSL.
+            proxy: extractProxy('https://t.me/socks?server=192.168.1.4&port=1081'),
         });
-        console.log(this.client.session.serverAddress);
         if (!this.client.session.serverAddress) {
             await this.client.start({
                 phoneNumber: async () => await input.text('Please enter your number: '),
