@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Hashtag from '../database/model/hashtag';
 import Music from '../database/model/music';
 import { logger } from '../config/logger';
+import { IExtractData } from '../utils/extractor';
 
 export interface IMusicInf {
     artist: string;
@@ -12,7 +13,7 @@ export interface IMusicInf {
 }
 
 class MusicService extends Service {
-    async addMusics(musicInformations: [IMusicInf]) {
+    async addMusics(musicInformations: IMusicInf[]) {
         const session = await mongoose.startSession();
         session.startTransaction();
 
@@ -64,7 +65,7 @@ class MusicService extends Service {
         await this._processMusicInformations(musicInformations, session);
     }
 
-    async removeMusic(musicInformations: [IMusicInf]) {
+    async removeMusic(musicInformations: IMusicInf[]) {
         const session = await mongoose.startSession();
         session.startTransaction();
 

@@ -18,19 +18,20 @@ export class Server {
     constructor() {
         this.setMongoConnection();
         this.setServer();
-        // cron.schedule('0 0 * * *', () => {
-        this.addMusic().then((result) => {});
-        // });
+        // // cron.schedule('0 0 * * *', () => {
+        // this.addMusic().then((result) => {});
+        // // });
     }
 
-    async addMusic() {
-        const musicInf = await telegramAdapter.getMusicInformation();
+    async addMusic(): Promise<void> {
+        const musicInf: IMusicInf[] = await telegramAdapter.getMusicInformation();
         if (musicInf.length > 0) {
             await musicService.addMusics(musicInf);
             await musicService.removeMusic(musicInf);
         }
-        return null;
     }
+
+    setSocketConfig() {}
 
     setServer() {
         /**

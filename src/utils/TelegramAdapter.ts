@@ -3,6 +3,7 @@ import { StringSession } from 'telegram/sessions';
 import { logger } from '../config/logger';
 import { extractData, extractProxy, IExtractData } from './extractor';
 import input from 'input';
+import { IMusicInf } from '../services/Music.service';
 
 class TelegramAdapter {
     private session: StringSession = new StringSession(Config.telegram.session);
@@ -30,24 +31,18 @@ class TelegramAdapter {
         logger.info('connected to telegram Successfully');
     }
 
-    async _getMusics(offsetDate: number | undefined) {
+    async _getMusics() {
         await this._connect();
         const filter = new Api.InputMessagesFilterMusic();
-        if (offsetDate) {
-            return await this.client.getMessages(this.channelUsername, {
-                offsetDate,
-                filter,
-            });
-        } else {
-            return await this.client.getMessages(this.channelUsername, {
-                filter,
-            });
-        }
+
+        return await this.client.getMessages(this.channelUsername, {
+            filter,
+        });
     }
 
-    async getMusicInformation(offsetDate: number | undefined = undefined) {
-        const musics = await this._getMusics(offsetDate);
-        const musicInfos: any = [];
+    async getMusicInformation(): Promise<IMusicInf[]> {
+        const musics = await this._getMusics();
+        const musicInfos: IMusicInf[] = [];
         for (const music of musics) {
             const data: IExtractData = extractData(music.message);
             const information = {
