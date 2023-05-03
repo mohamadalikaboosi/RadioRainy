@@ -51,12 +51,12 @@ class MusicService extends Service {
 
         const info = musicInformations.shift();
 
-        const hashtags = await Hashtag.find({ hashtag: { $nin: info.hashtags } }, { session });
+        const hashtags = await Hashtag.find({ hashtag: info.hashtags }, { session });
         const hashtagIds = hashtags.map((hashtag) => hashtag._id);
         const music = {
             artist: info.artist,
             musicName: info.music,
-            hashtags: hashtagIds,
+            Hashtag: hashtagIds,
             telegramId: info.telegramId,
         };
 

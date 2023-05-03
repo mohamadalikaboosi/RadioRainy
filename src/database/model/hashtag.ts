@@ -28,7 +28,7 @@ const hashtagSchema = new Schema<IHashtagDocument>(
 );
 hashtagSchema.loadClass(Hashtag);
 
-const HashtagModel = model<IHashtagDocument>('HashTag', hashtagSchema);
+const HashtagModel = model<IHashtagDocument>('Hashtag', hashtagSchema);
 
 export { HashtagModel };
 

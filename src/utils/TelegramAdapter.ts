@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { extractData, extractProxy, IExtractData } from './extractor';
 import input from 'input';
 import { IMusicInf } from '../services/Music.service';
+import fs from 'fs';
 
 class TelegramAdapter {
     private session: StringSession = new StringSession(Config.telegram.session);
@@ -12,7 +13,7 @@ class TelegramAdapter {
     private channelUsername: string = Config.telegram.channelUsername;
     private client!: TelegramClient;
 
-    async _connect() {
+    private async _connect() {
         this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {
             connectionRetries: 5,
             useWSS: false, // Important. Most proxies cannot use SSL.
@@ -31,12 +32,10 @@ class TelegramAdapter {
         logger.info('connected to telegram Successfully');
     }
 
-    async _getMusics() {
+    private async _getMusics() {
         await this._connect();
-        const filter = new Api.InputMessagesFilterMusic();
-
         return await this.client.getMessages(this.channelUsername, {
-            filter,
+            filter: new Api.InputMessagesFilterMusic(),
         });
     }
 
@@ -52,6 +51,20 @@ class TelegramAdapter {
             musicInfos.push(information);
         }
         return musicInfos;
+    }
+
+    async downloadFile(telegramId: number): Promise<boolean | undefined> {
+        await this._connect();
+        const music = await this.client.getMessages(this.channelUsername, {
+            ids: telegramId,
+        });
+        const media = music[0].media;
+        if (media) {
+            if (fs.existsSync(`${process.cwd()}/musics/${telegramId}.mp3`)) return true;
+            const buffer = await this.client.downloadMedia(media);
+            if (buffer) fs.writeFileSync(`${process.cwd()}/musics/${telegramId}.mp3`, buffer);
+            else await this.downloadFile(telegramId);
+        }
     }
 }
 

@@ -34,6 +34,7 @@
   "dependencies": {
     "@types/body-parser": "^1.19.2",
     "@types/node-cron": "^3.0.7",
+    "@types/underscore": "^1.11.4",
     "auto-bind": "^4.0.0",
     "body-parser": "^1.20.1",
     "cors": "^2.8.5",
@@ -48,8 +49,10 @@
     "mongoose": "^7.0.5",
     "morgan": "^1.10.0",
     "node-cron": "^3.0.2",
+    "socket.io": "^4.6.1",
     "telegram": "^2.16.4",
     "ts-node": "^10.9.1",
+    "underscore": "^1.13.6",
     "winston": "^3.8.2",
     "winston-daily-rotate-file": "^4.7.1"
   },

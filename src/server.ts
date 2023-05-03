@@ -8,36 +8,124 @@ import mongoose from 'mongoose';
 import cron from 'node-cron';
 import telegramAdapter from './utils/TelegramAdapter';
 import musicService, { IMusicInf } from './services/Music.service';
+import { Server as IOServer } from 'socket.io';
+import Music from './database/model/music';
+import music from './database/model/music';
+import fs from 'fs';
 
 export class Server {
-    port: number = Config.server.port;
-    server: any;
-    mongoDbName: string = Config.database.url;
-    debug = debug0('iRole-radio-rainy:server');
+    private port: number = Config.server.port;
+    private readonly server: http.Server;
+    private mongoDbName: string = Config.database.url;
+    private debug = debug0('iRole-radio-rainy:server');
+    private io: IOServer;
 
     constructor() {
+        this.server = http.createServer(new App().app);
+        this.io = new IOServer(this.server);
+        this.checkDirectory();
         this.setMongoConnection();
         this.setServer();
         // // cron.schedule('0 0 * * *', () => {
-        // this.addMusic().then((result) => {});
+        // this.addMusic().then(() => {
+        //     logger.info('get Music from Telegram Successfully !')
+        // });
         // // });
     }
 
     async addMusic(): Promise<void> {
-        const musicInf: IMusicInf[] = await telegramAdapter.getMusicInformation();
-        if (musicInf.length > 0) {
-            await musicService.addMusics(musicInf);
-            await musicService.removeMusic(musicInf);
-        }
+        // const musicInf: IMusicInf[] = await telegramAdapter.getMusicInformation();
+        // if (musicInf.length > 0) {
+        //     await musicService.addMusics(musicInf);
+        //     await musicService.removeMusic(musicInf);
+        // }
+        const music = await Music.find(
+            {},
+            {
+                select: 'artist telegramId musicName Hashtag',
+                populate: [{ path: 'Hashtag', model: 'Hashtag', select: 'hashtag' }],
+            },
+        );
+        // const musicBuffer = await telegramAdapter.downloadFile(music[1].telegramId);
     }
 
-    setSocketConfig() {}
+    setSocketConfig() {
+        // this.io.on('connection', (socket) => {
+        //     // ---------------- users ----------------
+        //     socket.on('users:addUser', (username) => {
+        //         const id: string = socket.id;
+        //         users.setUser({ id, username });
+        //         this.io.emit('admin:addNewUser', { id, username });
+        //     });
+        //
+        //     // ---------------- Admin ----------------
+        //     socket.on('admin:selectMusic', (musicName) => {
+        //         queue.setIsPLaying(true);
+        //         queue.setPlayingTrack(musicName);
+        //         io.emit('client:playSelectedSong', musicName);
+        //     });
+        //
+        //     socket.on('admin:playButton', () => {
+        //         if (!queue.getIsPLaying()) {
+        //             queue.setIsPLaying(true);
+        //             io.emit('client:playButton');
+        //         }
+        //     });
+        //
+        //     socket.on('admin:pauseButton', (musicInfo) => {
+        //         queue.setIsPLaying(false);
+        //         queue.setCurrentTime(musicInfo.currentTime);
+        //         queue.setPlayingTrack(musicInfo.musicName);
+        //         io.emit('client:pauseButton');
+        //     });
+        //
+        //     socket.on('admin:songEnded', (musicName) => {
+        //         queue.setIsPLaying(false);
+        //         const nextMusicName = queue.nextSong(musicName);
+        //         io.emit('admin:playNextSong', nextMusicName);
+        //     });
+        //
+        //     socket.on('admin:setCurrentTime', (currentTime) => {
+        //         queue.setCurrentTime(currentTime);
+        //         const musicInfo = {
+        //             musicName: queue.getPlayingTrack(),
+        //             currentTime: queue.getCurrentTime(),
+        //         };
+        //         io.emit('client:playIsPlayingSong', musicInfo);
+        //     });
+        //
+        //     // ---------------- client ---------------
+        //     socket.on('client:checkPlaying', () => {
+        //         if (queue.getIsPLaying()) {
+        //             io.emit('admin:getCurrentTime');
+        //         }
+        //     });
+        //
+        //     socket.on('disconnect', () => {
+        //         users.deleteUser(socket.id);
+        //         io.emit('admin:deleteUser', socket.id);
+        //     });
+        // });
+    }
+
+    checkDirectory() {
+        const musicDirectoryPath = './musics';
+        // Check if the directory already exists
+        if (fs.existsSync('./musics')) return;
+
+        // If the directory doesn't exist, create it
+        fs.mkdir(musicDirectoryPath, { recursive: true }, (err) => {
+            if (err) {
+                logger.info('Failed to create directory');
+            }
+            logger.info('Music directory created successfully!');
+        });
+    }
 
     setServer() {
         /**
          * Create HTTP server.
          */
-        this.server = http.createServer(new App().app);
         this.server.listen(this.port, () => {
             logger.info(`Server listening on port: ${this.port} Mode = ${Config.server.environment}`);
         });

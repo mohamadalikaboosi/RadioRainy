@@ -1,12 +1,13 @@
 import { Document, model, Schema, Types } from 'mongoose';
 import Repository from '../Repository';
+import { HashtagModel } from './hashtag';
 
 export interface IMusicDocument extends Document {
     telegramId: number;
     filePath: string;
     artist: string;
     musicName: string;
-    hashtags: Types.ObjectId[];
+    Hashtag: Types.ObjectId[];
 }
 
 class Music extends Repository<IMusicDocument> {
@@ -21,7 +22,7 @@ const musicSchema = new Schema<IMusicDocument>(
         filePath: { type: String, required: false },
         artist: { type: String, required: true },
         musicName: { type: String, required: true },
-        hashtags: [{ type: Types.ObjectId, ref: 'HashTag', required: true }],
+        Hashtag: [{ type: Types.ObjectId, ref: HashtagModel, required: true }],
     },
     {
         timestamps: true,

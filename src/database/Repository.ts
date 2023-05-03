@@ -32,7 +32,7 @@ interface PaginationOptions {
 }
 
 interface IRepository<T extends Document> {
-    find(where: object, options: IOption): Promise<T[]>;
+    find(where: object, options: IOption, lean: boolean): Promise<T[]>;
 
     count(where: object, options: IOption): Promise<number>;
 
@@ -73,7 +73,8 @@ export default class Repository<T extends Document> implements IRepository<T> {
     }
 
     // Find
-    async find(where: object, options: IOption = {}): Promise<any[]> {
+    async find(where: object, options: IOption = {}, lean: boolean = true): Promise<any[]> {
+        if (lean) return this.model.find(where, {}, options).lean().exec();
         return this.model.find(where, {}, options).exec();
     }
 
