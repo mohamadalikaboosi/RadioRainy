@@ -12,6 +12,7 @@ import { Server as IOServer } from 'socket.io';
 import Music from './database/model/music';
 import music from './database/model/music';
 import fs from 'fs';
+import _ from 'underscore';
 
 export class Server {
     private port: number = Config.server.port;
@@ -26,27 +27,55 @@ export class Server {
         this.checkDirectory();
         this.setMongoConnection();
         this.setServer();
+        // this.downloadMusic().then(() => {
+        //     logger.info('Download Music from Telegram Successfully !');
+        // });
         // // cron.schedule('0 0 * * *', () => {
         // this.addMusic().then(() => {
-        //     logger.info('get Music from Telegram Successfully !')
+        //     logger.info('update Music Information from Telegram Successfully !');
+        //     this.downloadMusic().then(() => {
+        //         logger.info('Download Updated Music from Telegram Successfully !');
+        //     });
         // });
         // // });
     }
 
     async addMusic(): Promise<void> {
+        const a = await musicService.findAllMusicNotDownload();
+        console.log('=>(server.ts:39) a', a);
         // const musicInf: IMusicInf[] = await telegramAdapter.getMusicInformation();
         // if (musicInf.length > 0) {
         //     await musicService.addMusics(musicInf);
         //     await musicService.removeMusic(musicInf);
         // }
-        const music = await Music.find(
-            {},
-            {
-                select: 'artist telegramId musicName Hashtag',
-                populate: [{ path: 'Hashtag', model: 'Hashtag', select: 'hashtag' }],
-            },
-        );
-        // const musicBuffer = await telegramAdapter.downloadFile(music[1].telegramId);
+    }
+
+    async downloadMusic(): Promise<void> {
+        const telegramIds: number[] = await musicService.findAllMusicNotDownload();
+        if (telegramIds.length > 0) {
+            await this._downloadProcess(telegramIds);
+        } else {
+            logger.info('There is not Any Music For Download');
+        }
+    }
+
+    private async _downloadProcess(telegramIds): Promise<void> {
+        if (telegramIds.length === 0) {
+            console.log('All downloads completed.');
+            return;
+        }
+
+        const musicId = telegramIds.shift();
+
+        const success = await telegramAdapter.downloadFile(musicId);
+        await musicService.updateMusicPath(musicId);
+        if (success) {
+            console.log(`Downloaded music with telegramId: ${musicId}`);
+        } else {
+            console.log(`Failed to download music with telegramId: ${musicId}`);
+        }
+
+        await this._downloadProcess(telegramIds);
     }
 
     setSocketConfig() {
@@ -108,13 +137,12 @@ export class Server {
         // });
     }
 
-    checkDirectory() {
-        const musicDirectoryPath = './musics';
+    checkDirectory(): void {
         // Check if the directory already exists
-        if (fs.existsSync('./musics')) return;
+        if (fs.existsSync(Config.music.musicPath)) return;
 
         // If the directory doesn't exist, create it
-        fs.mkdir(musicDirectoryPath, { recursive: true }, (err) => {
+        fs.mkdir(Config.music.musicPath, { recursive: true }, (err) => {
             if (err) {
                 logger.info('Failed to create directory');
             }
@@ -122,7 +150,7 @@ export class Server {
         });
     }
 
-    setServer() {
+    setServer(): void {
         /**
          * Create HTTP server.
          */
@@ -132,7 +160,7 @@ export class Server {
         this.server.on('error', this.onError);
     }
 
-    setMongoConnection() {
+    setMongoConnection(): void {
         //process.env.DatabaseUrl === undefined ? this.mongoDbName = process.env.DatabaseUrl : Config.database.url;
         mongoose.set('strictQuery', Config.database.strictQuery);
         mongoose
@@ -144,7 +172,7 @@ export class Server {
     /**
      * Event listener for HTTP server "error" event.
      */
-    onError(error: any) {
+    onError(error: any): void {
         if (error.syscall !== 'listen') {
             throw error;
         }

@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 import Hashtag from '../database/model/hashtag';
 import Music from '../database/model/music';
 import { logger } from '../config/logger';
-import { IExtractData } from '../utils/extractor';
+import hashtagService from './Hashtag.service';
+import _ from 'underscore';
 
 export interface IMusicInf {
     artist: string;
@@ -13,14 +14,14 @@ export interface IMusicInf {
 }
 
 class MusicService extends Service {
-    async addMusics(musicInformations: IMusicInf[]) {
+    async addMusics(musicInformations: IMusicInf[]): Promise<void> {
         const session = await mongoose.startSession();
         session.startTransaction();
 
         try {
             const beforeAdd = await Music.count({});
             const uniqueHashtags = [...new Set(musicInformations.flatMap((obj) => obj.hashtags))];
-            await this._upsertHashtags(uniqueHashtags, session);
+            await hashtagService.upsertHashtags(uniqueHashtags, session);
             await this._processMusicInformations([...musicInformations], session);
             await session.commitTransaction();
             const afterAdd = await Music.count({});
@@ -32,22 +33,8 @@ class MusicService extends Service {
         }
     }
 
-    async _upsertHashtags(hashtags, session) {
-        if (hashtags.length === 0) {
-            return;
-        }
-
-        const hashtag = hashtags.shift();
-
-        await Hashtag.upsert({ hashtag: hashtag }, { hashtag: hashtag }, session);
-
-        await this._upsertHashtags(hashtags, session);
-    }
-
-    async _processMusicInformations(musicInformations, session) {
-        if (musicInformations.length === 0) {
-            return;
-        }
+    private async _processMusicInformations(musicInformations, session): Promise<void> {
+        if (musicInformations.length === 0) return;
 
         const info = musicInformations.shift();
 
@@ -65,7 +52,7 @@ class MusicService extends Service {
         await this._processMusicInformations(musicInformations, session);
     }
 
-    async removeMusic(musicInformations: IMusicInf[]) {
+    async removeMusic(musicInformations: IMusicInf[]): Promise<void> {
         const session = await mongoose.startSession();
         session.startTransaction();
 
@@ -81,6 +68,27 @@ class MusicService extends Service {
         } finally {
             await session.endSession();
         }
+    }
+
+    async findAllMusicNotDownload(): Promise<number[]> {
+        const musics = await Music.find({ filePath: null }, { select: 'telegramId' });
+        return musics.map((music) => music.telegramId);
+    }
+
+    async findMusicsRandom() {
+        return _.shuffle(
+            await Music.find(
+                {},
+                {
+                    select: 'artist telegramId musicName Hashtag',
+                    populate: [{ path: 'Hashtag', model: 'Hashtag', select: 'hashtag' }],
+                },
+            ),
+        );
+    }
+
+    async updateMusicPath(telegramId) {
+        await Music.findOneAndUpdate({ telegramId }, { filePath: `/${telegramId}.mp3` });
     }
 }
 

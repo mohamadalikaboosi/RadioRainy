@@ -3,7 +3,7 @@ import { StringSession } from 'telegram/sessions';
 import { logger } from '../config/logger';
 import { extractData, extractProxy, IExtractData } from './extractor';
 import input from 'input';
-import { IMusicInf } from '../services/Music.service';
+import musicService, { IMusicInf } from '../services/Music.service';
 import fs from 'fs';
 
 class TelegramAdapter {
@@ -60,10 +60,12 @@ class TelegramAdapter {
         });
         const media = music[0].media;
         if (media) {
-            if (fs.existsSync(`${process.cwd()}/musics/${telegramId}.mp3`)) return true;
+            if (fs.existsSync(`${Config.music.musicPath}/${telegramId}.mp3`)) return true;
             const buffer = await this.client.downloadMedia(media);
-            if (buffer) fs.writeFileSync(`${process.cwd()}/musics/${telegramId}.mp3`, buffer);
-            else await this.downloadFile(telegramId);
+            if (buffer) {
+                fs.writeFileSync(`${Config.music.musicPath}/${telegramId}.mp3`, buffer);
+                return true;
+            } else await this.downloadFile(telegramId);
         }
     }
 }

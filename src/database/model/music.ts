@@ -19,7 +19,7 @@ class Music extends Repository<IMusicDocument> {
 const musicSchema = new Schema<IMusicDocument>(
     {
         telegramId: { type: Number, required: true, index: true },
-        filePath: { type: String, required: false },
+        filePath: { type: String, required: false, default: null },
         artist: { type: String, required: true },
         musicName: { type: String, required: true },
         Hashtag: [{ type: Types.ObjectId, ref: HashtagModel, required: true }],
