@@ -13,6 +13,7 @@ import Music from './database/model/music';
 import music from './database/model/music';
 import fs from 'fs';
 import _ from 'underscore';
+import queue from './utils/Queue';
 
 export class Server {
     private port: number = Config.server.port;
@@ -23,10 +24,15 @@ export class Server {
 
     constructor() {
         this.server = http.createServer(new App().app);
-        this.io = new IOServer(this.server);
+        this.io = new IOServer(this.server, {
+            cors: {
+                origin: '*',
+            },
+        });
         this.checkDirectory();
         this.setMongoConnection();
         this.setServer();
+        this.setSocketConfig().then();
         // this.downloadMusic().then(() => {
         //     logger.info('Download Music from Telegram Successfully !');
         // });
@@ -78,63 +84,40 @@ export class Server {
         await this._downloadProcess(telegramIds);
     }
 
-    setSocketConfig() {
-        // this.io.on('connection', (socket) => {
-        //     // ---------------- users ----------------
-        //     socket.on('users:addUser', (username) => {
-        //         const id: string = socket.id;
-        //         users.setUser({ id, username });
-        //         this.io.emit('admin:addNewUser', { id, username });
-        //     });
-        //
-        //     // ---------------- Admin ----------------
-        //     socket.on('admin:selectMusic', (musicName) => {
-        //         queue.setIsPLaying(true);
-        //         queue.setPlayingTrack(musicName);
-        //         io.emit('client:playSelectedSong', musicName);
-        //     });
-        //
-        //     socket.on('admin:playButton', () => {
-        //         if (!queue.getIsPLaying()) {
-        //             queue.setIsPLaying(true);
-        //             io.emit('client:playButton');
-        //         }
-        //     });
-        //
-        //     socket.on('admin:pauseButton', (musicInfo) => {
-        //         queue.setIsPLaying(false);
-        //         queue.setCurrentTime(musicInfo.currentTime);
-        //         queue.setPlayingTrack(musicInfo.musicName);
-        //         io.emit('client:pauseButton');
-        //     });
-        //
-        //     socket.on('admin:songEnded', (musicName) => {
-        //         queue.setIsPLaying(false);
-        //         const nextMusicName = queue.nextSong(musicName);
-        //         io.emit('admin:playNextSong', nextMusicName);
-        //     });
-        //
-        //     socket.on('admin:setCurrentTime', (currentTime) => {
-        //         queue.setCurrentTime(currentTime);
-        //         const musicInfo = {
-        //             musicName: queue.getPlayingTrack(),
-        //             currentTime: queue.getCurrentTime(),
-        //         };
-        //         io.emit('client:playIsPlayingSong', musicInfo);
-        //     });
-        //
-        //     // ---------------- client ---------------
-        //     socket.on('client:checkPlaying', () => {
-        //         if (queue.getIsPLaying()) {
-        //             io.emit('admin:getCurrentTime');
-        //         }
-        //     });
-        //
-        //     socket.on('disconnect', () => {
-        //         users.deleteUser(socket.id);
-        //         io.emit('admin:deleteUser', socket.id);
-        //     });
-        // });
+    async setSocketConfig() {
+        await queue.loadTracks();
+        queue.play();
+
+        this.io.on('connection', (socket) => {
+            // Every new streamer must receive the header
+            if (queue.bufferHeader) {
+                socket.emit('bufferHeader', queue.bufferHeader);
+            }
+
+            socket.on('bufferHeader', (header) => {
+                queue.bufferHeader = header;
+                socket.broadcast.emit('bufferHeader', queue.bufferHeader);
+            });
+
+            socket.on('stream', (packet) => {
+                // Only broadcast microphone if a header has been received
+                if (!queue.bufferHeader) return;
+
+                // Audio stream from host microphone
+                socket.broadcast.emit('stream', packet);
+            });
+
+            socket.on('control', (command) => {
+                switch (command) {
+                    case 'pause':
+                        queue.pause();
+                        break;
+                    case 'resume':
+                        queue.resume();
+                        break;
+                }
+            });
+        });
     }
 
     checkDirectory(): void {

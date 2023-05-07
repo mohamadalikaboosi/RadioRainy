@@ -10,13 +10,21 @@ import musicService from '../services/Music.service';
 ffprobe.path = ffprobeStatic.path;
 
 class Queue {
-    clients = new Map();
+    clients;
     tracks;
     index;
     currentTrack;
     playing;
     throttle;
     stream;
+    bufferHeader;
+
+    constructor() {
+        this.tracks = [];
+        this.index = 0;
+        this.clients = new Map();
+        this.bufferHeader = null;
+    }
 
     current() {
         return this.tracks[this.index];
@@ -31,7 +39,6 @@ class Queue {
     addClient() {
         const id = uuid();
         const client = new PassThrough();
-
         this.clients.set(id, client);
         return { id, client };
     }
@@ -43,7 +50,7 @@ class Queue {
     async loadTracks() {
         const tracks = await musicService.findMusicsRandom();
         // Add directory name back to filenames
-        const filepaths = tracks.map((track) => join(Config.music.musicPath, track.musicPath));
+        const filepaths = tracks.map((track) => join(Config.music.musicPath, track.filePath));
 
         const promises = filepaths.map(async (filepath) => {
             const bitrate = await this.getTrackBitrate(filepath);

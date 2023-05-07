@@ -13,6 +13,8 @@ import cors from 'cors';
 import { router } from './api/routes';
 import { morganMiddleware } from './config/logger';
 import rateLimit from 'express-rate-limit';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 export class App {
     public app;
@@ -24,6 +26,9 @@ export class App {
     }
 
     setConfig() {
+        const outputDir = `${process.cwd()}/dist`;
+
+        this.app.use(express.static(outputDir));
         if (process.env.NODE_ENV !== 'test') {
             this.app.use(morganMiddleware);
         }
@@ -31,7 +36,7 @@ export class App {
         this.app.use(rateLimit(Config.rateLimit));
         this.app.use(cors(Config.cors));
         // Helmet Config
-        this.app.use(helmet());
+        //this.app.use(helmet());
         // Input Post Values to req.body
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));

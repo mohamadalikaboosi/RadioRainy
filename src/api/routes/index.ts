@@ -4,7 +4,8 @@ import mainController from '../controllers/Main.controller';
 
 const router = express.Router();
 
-router.get('/stream', mainController.main);
+router.get('/', mainController.main);
+router.get('/stream', mainController.stream);
 
 // Error 404
 router.all('*', () => {
