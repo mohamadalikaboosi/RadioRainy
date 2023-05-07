@@ -1,10 +1,10 @@
 import express from 'express';
 import { NotFoundError, ErrorHandlerMiddleware } from 'irolegroup';
-import { telegramRouter } from './telegram';
+import mainController from '../controllers/Main.controller';
 
 const router = express.Router();
 
-router.use('/telegram', telegramRouter);
+router.get('/stream', mainController.main);
 
 // Error 404
 router.all('*', () => {

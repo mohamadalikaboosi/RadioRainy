@@ -78,9 +78,9 @@ class MusicService extends Service {
     async findMusicsRandom() {
         return _.shuffle(
             await Music.find(
-                {},
+                { filePath: { $nin: null } },
                 {
-                    select: 'artist telegramId musicName Hashtag',
+                    select: 'artist telegramId musicName Hashtag filePath',
                     populate: [{ path: 'Hashtag', model: 'Hashtag', select: 'hashtag' }],
                 },
             ),

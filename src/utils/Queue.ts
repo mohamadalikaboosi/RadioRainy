@@ -1,56 +1,133 @@
-// Queue.ts
-import { IMusicDocument } from '../database/model/music';
+import { v4 as uuid } from 'uuid';
+import { PassThrough } from 'stream';
+import Throttle from 'throttle';
+import { ffprobe } from '@dropb/ffprobe';
+import ffprobeStatic from 'ffprobe-static';
+import { createReadStream } from 'fs';
+import { join } from 'path';
+import musicService from '../services/Music.service';
+
+ffprobe.path = ffprobeStatic.path;
 
 class Queue {
-    private songs: IMusicDocument[];
-    private currentSongIndex: number;
+    clients = new Map();
+    tracks;
+    index;
+    currentTrack;
+    playing;
+    throttle;
+    stream;
 
-    constructor() {
-        this.songs = [];
-        this.currentSongIndex = 0;
+    current() {
+        return this.tracks[this.index];
     }
 
-    loadSongs(song: IMusicDocument) {
-        this.songs.push(song);
+    broadcast(chunk) {
+        this.clients.forEach((client) => {
+            client.write(chunk);
+        });
     }
 
-    dequeue() {
-        if (this.songs.length > 0) {
-            this.songs.shift();
-            if (this.currentSongIndex > 0) {
-                this.currentSongIndex--;
-            }
+    addClient() {
+        const id = uuid();
+        const client = new PassThrough();
+
+        this.clients.set(id, client);
+        return { id, client };
+    }
+
+    removeClient(id) {
+        this.clients.delete(id);
+    }
+
+    async loadTracks() {
+        const tracks = await musicService.findMusicsRandom();
+        // Add directory name back to filenames
+        const filepaths = tracks.map((track) => join(Config.music.musicPath, track.musicPath));
+
+        const promises = filepaths.map(async (filepath) => {
+            const bitrate = await this.getTrackBitrate(filepath);
+
+            return { filepath, bitrate };
+        });
+
+        this.tracks = await Promise.all(promises);
+        console.log(`Loaded ${this.tracks.length} tracks`);
+    }
+
+    async getTrackBitrate(filepath) {
+        const data = await ffprobe(filepath);
+        const bitrate = data?.format?.bit_rate;
+
+        return bitrate ? parseInt(bitrate) : 128000;
+    }
+
+    getNextTrack() {
+        // Loop back to the first track
+        if (this.index >= this.tracks.length - 1) {
+            this.index = 0;
+        }
+
+        const track = this.tracks[this.index++];
+        this.currentTrack = track;
+
+        return track;
+    }
+
+    pause() {
+        if (!this.started() || !this.playing) return;
+        this.playing = false;
+        console.log('Paused');
+        this.throttle.removeAllListeners('end');
+        this.throttle.end();
+    }
+
+    resume() {
+        if (!this.started() || this.playing) return;
+        console.log('Resumed');
+        this.start();
+    }
+
+    started() {
+        return this.stream && this.throttle && this.currentTrack;
+    }
+
+    // Play new track if there's no current track or useNewTrack is true
+    // Otherwise, resume the current track
+    play(useNewTrack = false) {
+        if (useNewTrack || !this.currentTrack) {
+            console.log('Playing new track');
+            this.getNextTrack();
+            this.loadTrackStream();
+            this.start();
+        } else {
+            this.resume();
         }
     }
 
-    getCurrentSong(): Song | null {
-        if (this.songs.length > 0) {
-            return this.songs[this.currentSongIndex];
-        }
-        return null;
+    // Get the stream from the filepath
+    loadTrackStream() {
+        const track = this.currentTrack;
+        if (!track) return;
+
+        console.log('Starting audio stream');
+        this.stream = createReadStream(track.filepath);
     }
 
-    getNextSong(): Song | null {
-        if (this.currentSongIndex < this.songs.length - 1) {
-            return this.songs[this.currentSongIndex + 1];
-        }
-        return null;
-    }
+    // Start broadcasting audio stream
+    start() {
+        const track = this.currentTrack;
+        if (!track) return;
 
-    playNextSong() {
-        if (this.currentSongIndex < this.songs.length - 1) {
-            this.currentSongIndex++;
-        }
-    }
+        this.playing = true;
+        this.throttle = new Throttle(track.bitrate / 8);
 
-    getQueue(): IMusicDocument[] {
-        return this.songs;
-    }
-
-    clearQueue() {
-        this.songs = [];
-        this.currentSongIndex = 0;
+        this.stream
+            .pipe(this.throttle)
+            .on('data', (chunk) => this.broadcast(chunk))
+            .on('end', () => this.play(true))
+            .on('error', () => this.play(true));
     }
 }
 
-export default Queue;
+export default new Queue();
