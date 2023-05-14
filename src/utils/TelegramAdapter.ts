@@ -6,6 +6,7 @@ import input from 'input';
 import { IMusicInf } from '../services/Music.service';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
+import { ffmegCompress } from './ffmeg';
 
 class TelegramAdapter {
     private session: StringSession = new StringSession(Config.telegram.session);
@@ -71,16 +72,7 @@ class TelegramAdapter {
 
             const buffer = await this.client.downloadMedia(media);
             if (buffer) {
-                fs.writeFileSync(filePathOrg, buffer);
-                // Convert the music to low quality
-                await new Promise((resolve, reject) => {
-                    ffmpeg(filePathOrg)
-                        .audioBitrate('64k') // Set the desired low bitrate
-                        .output(filePath)
-                        .on('end', resolve)
-                        .on('error', reject)
-                        .run();
-                });
+                await ffmegCompress(buffer, filePathOrg, filePath);
                 fs.unlinkSync(filePathOrg);
                 return true;
             } else {

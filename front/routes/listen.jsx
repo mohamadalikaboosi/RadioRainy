@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 import useAudioStreamer from "../hooks/useAudioStreamer";
 import { Headphones } from "react-feather";
 
-const URL = "http://192.168.1.6:3001";
+const URL = "http://192.168.1.3:3001";
 
 function Listen() {
     const socketRef = useRef(io(URL));

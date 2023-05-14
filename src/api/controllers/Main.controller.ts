@@ -1,8 +1,8 @@
 import Controller from './Controller';
 import { Response, Request, NextFunction } from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import queue from '../../utils/Queue';
+import ip from 'ip';
 
 class MainController extends Controller {
     async main(req: Request, res: Response, next: NextFunction): Promise<any> {
@@ -27,6 +27,15 @@ class MainController extends Controller {
             req.on('close', () => {
                 queue.removeClient(id);
             });
+        } catch (e: any) {
+            next(e);
+        }
+    }
+
+    async getIp(req: Request, res: Response, next: NextFunction): Promise<any> {
+        try {
+            const serverIp = ip.address();
+            res.json({ serverIp });
         } catch (e: any) {
             next(e);
         }

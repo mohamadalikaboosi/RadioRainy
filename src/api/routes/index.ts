@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get('/', mainController.main);
 router.get('/stream', mainController.stream);
+router.get('/getIp', mainController.getIp);
 
 // Error 404
 router.all('*', () => {
