@@ -7,6 +7,7 @@ const router = express.Router();
 router.get('/', mainController.main);
 router.get('/stream', mainController.stream);
 router.get('/getIp', mainController.getIp);
+router.get('/getCurrentTrackInfo', mainController.getCurrentTrackInfo);
 
 // Error 404
 router.all('*', () => {

@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
 import cron from 'node-cron';
 import telegramAdapter from './utils/TelegramAdapter';
 import musicService, { IMusicInf } from './services/Music.service';
-import { Server as IOServer } from 'socket.io';
+import { Server as IOServer, Socket } from 'socket.io';
 import Music from './database/model/music';
 import music from './database/model/music';
 import fs from 'fs';
@@ -20,7 +20,7 @@ export class Server {
     private readonly server: http.Server;
     private mongoDbName: string = Config.database.url;
     private debug = debug0('iRole-radio-rainy:server');
-    private io: IOServer;
+    private readonly io: IOServer;
 
     constructor() {
         this.server = http.createServer(new App().app);
@@ -83,8 +83,7 @@ export class Server {
     }
 
     async setupStream() {
-        await queue.loadTracks();
-        queue.play(false, this.io);
+        await queue.SettingUp(this.io);
     }
 
     checkDirectory(): void {

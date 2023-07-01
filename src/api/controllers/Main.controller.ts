@@ -1,8 +1,8 @@
 import Controller from './Controller';
 import { Response, Request, NextFunction } from 'express';
 import path from 'path';
-import queue from '../../utils/Queue';
 import ip from 'ip';
+import queue from '../../utils/Queue';
 
 class MainController extends Controller {
     async main(req: Request, res: Response, next: NextFunction): Promise<any> {
@@ -36,6 +36,14 @@ class MainController extends Controller {
         try {
             const serverIp = ip.address();
             res.json({ serverIp });
+        } catch (e: any) {
+            next(e);
+        }
+    }
+
+    async getCurrentTrackInfo(req: Request, res: Response, next: NextFunction): Promise<any> {
+        try {
+            res.json(queue.getMusicInfo());
         } catch (e: any) {
             next(e);
         }

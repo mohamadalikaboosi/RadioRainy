@@ -5,7 +5,6 @@ import { extractData, extractProxy, IExtractData } from './extractor';
 import input from 'input';
 import { IMusicInf } from '../services/Music.service';
 import fs from 'fs';
-import ffmpeg from 'fluent-ffmpeg';
 import { ffmegCompress } from './ffmeg';
 
 class TelegramAdapter {
@@ -20,7 +19,7 @@ class TelegramAdapter {
             this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {
                 connectionRetries: 5,
                 useWSS: false, // Important. Most proxies cannot use SSL.
-                proxy: extractProxy('https://t.me/socks?server=192.168.1.5&port=3080'),
+                // proxy: extractProxy('https://t.me/socks?server=192.168.43.1&port=1081'),
             });
             if (!this.client.session.serverAddress) {
                 await this.client.start({

@@ -6,6 +6,8 @@ import ffprobeStatic from 'ffprobe-static';
 import { createReadStream } from 'fs';
 import { join } from 'path';
 import musicService from '../services/Music.service';
+import { Server as IOServer } from 'socket.io';
+import { logger } from '../config/logger';
 
 ffprobe.path = ffprobeStatic.path;
 
@@ -25,13 +27,15 @@ interface TrackInfo {
 
 class Queue {
     private clients: Map<string, PassThrough>;
-    private tracks: TrackInfo[];
+    private readonly tracks: TrackInfo[];
     private index: number;
     private currentTrack!: TrackInfo | null;
     private playing!: boolean;
     private throttle: Throttle | null;
     private stream!: NodeJS.ReadableStream;
     public bufferHeader: any;
+    private io!: IOServer;
+    private sendSocket: boolean = false;
 
     constructor() {
         this.tracks = [];
@@ -39,14 +43,21 @@ class Queue {
         this.clients = new Map<string, PassThrough>();
         this.bufferHeader = null;
     }
-    public current(): TrackInfo | null {
-        return this.tracks[this.index] || null;
+
+    public current(): TrackInfo {
+        return this.tracks[this.index];
     }
 
     public broadcast(chunk: any): void {
         this.clients.forEach((client) => {
             client.write(chunk);
         });
+        if (this.sendSocket) {
+            this.sendSocket = false;
+            this.io.on('connection', () => {
+                this.io.emit('currentMusicInfo', this.getMusicInfo());
+            });
+        }
     }
 
     public addClient(): Client {
@@ -60,35 +71,6 @@ class Queue {
         this.clients.delete(id);
     }
 
-    public async loadTracks(): Promise<void> {
-        const tracks = await musicService.findMusicsRandom();
-        // Add directory name back to filenames
-        const musicsInf = tracks.map((track) => {
-            return {
-                filePath: join(Config.music.musicPath, track.filePath),
-                telegramId: track.telegramId,
-                artist: track.artist,
-                musicName: track.musicName,
-                Hashtag: [...track.Hashtag],
-            };
-        });
-
-        const promises = musicsInf.map(async (musicInf) => {
-            const bitrate = await this.getTrackBitrate(musicInf.filePath);
-            return {
-                filePath: musicInf.filePath,
-                bitrate,
-                telegramId: musicInf.telegramId,
-                artist: musicInf.artist,
-                musicName: musicInf.musicName,
-                Hashtag: musicInf.Hashtag,
-            };
-        });
-
-        this.tracks = await Promise.all(promises);
-        console.log(`Loaded ${this.tracks.length} tracks`);
-    }
-
     private async getTrackBitrate(filePath: string): Promise<number> {
         const data = await ffprobe(filePath);
         const bitrate = data?.format?.bit_rate;
@@ -96,66 +78,86 @@ class Queue {
         return bitrate ? parseInt(bitrate) : 128000;
     }
 
-    private getMusicInfo(trackInfo: TrackInfo | null) {
-        if (!trackInfo) return null;
-        const { telegramId, artist, musicName, Hashtag } = trackInfo;
+    public getMusicInfo() {
+        if (!this.currentTrack) return null;
+        const { telegramId, artist, musicName, Hashtag } = this.currentTrack;
         const hashtags = Hashtag.map((obj) => Object.values(obj)[1]) as string[];
 
         return { telegramId, artist, musicName, hashtags };
     }
 
+    public async SettingUp(io) {
+        this.setIo(io);
+        await this.loadTracks();
+        this.play();
+    }
+
+    private setIo(io: IOServer) {
+        this.io = io;
+    }
+
+    private async loadTracks(): Promise<void> {
+        const tracks = await musicService.findMusicsRandom();
+        // Add directory name back to filenames
+        for (const track of tracks) {
+            this.tracks.push({
+                bitrate: await this.getTrackBitrate(join(Config.music.musicPath, track.filePath)),
+                filePath: join(Config.music.musicPath, track.filePath),
+                telegramId: track.telegramId,
+                artist: track.artist,
+                musicName: track.musicName,
+                Hashtag: [...track.Hashtag],
+            });
+        }
+        logger.info(`Loaded ${this.tracks.length} tracks`);
+    }
+
+    play(useNewTrack = false) {
+        // Move the event listener registration outside the function
+        // Only execute the following code if useNewTrack is true or no current track is set
+        if (useNewTrack || !this.currentTrack) {
+            if (useNewTrack) logger.info('Playing new track');
+            this.getNextTrack();
+            this.loadTrackStream();
+            this.start();
+        } else {
+            this.resume();
+        }
+    }
+
     private getNextTrack(): void {
+        this.sendSocket = true;
         if (this.index >= this.tracks.length - 1) {
             this.index = 0;
         }
         this.currentTrack = this.tracks[this.index++];
     }
 
-    public resume(io): void {
-        if (!this.started() || this.playing) return;
-        console.log('Resumed');
-        this.start(io);
-    }
-
-    public started(): boolean {
-        return this.stream && this.throttle && this.currentTrack;
-    }
-
-    // Play new track if there's no current track or useNewTrack is true
-    // Otherwise, resume the current track
-    play(useNewTrack = false, io) {
-        // Move the event listener registration outside the function
-        // Only execute the following code if useNewTrack is true or no current track is set
-        if (useNewTrack || !this.currentTrack) {
-            console.log('Playing new track');
-            this.getNextTrack();
-            this.loadTrackStream();
-            io.emit('currentMusicInfo', this.getMusicInfo(this.currentTrack));
-            this.start(io);
-        } else {
-            io.emit('currentMusicInfo', this.getMusicInfo(this.currentTrack));
-            this.resume(io);
-        }
-    }
-
-    // Get the stream from the filepath
     loadTrackStream() {
         const track = this.currentTrack;
         if (!track) return;
-        console.log('Starting audio stream');
+        logger.info('Starting audio stream');
+        this.playing = true;
         this.stream = createReadStream(track.filePath);
     }
 
-    private async start(io): Promise<void> {
+    private start(): void {
         const track = this.currentTrack;
         if (!track) return;
         this.playing = true;
         this.throttle = new Throttle(track.bitrate / 8);
-        this.stream
-            .pipe(this.throttle)
-            .on('data', (chunk) => this.broadcast(chunk))
-            .on('end', () => this.play(true, io))
-            .on('error', () => this.play(true, io));
+        this.throttle.on('data', (chunk) => this.broadcast(chunk)).on('error', () => this.play(true));
+        this.stream.pipe(this.throttle).on('end', () => this.play(true)); // Listen for the 'end' event of the stream
+    }
+
+    public resume(): void {
+        if (!this.started() || this.playing) return;
+        logger.info('Resumed');
+        this.start();
+    }
+
+    public started(): boolean {
+        return this.stream && this.throttle && this.currentTrack;
     }
 }
 
